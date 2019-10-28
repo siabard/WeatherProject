@@ -148,9 +148,50 @@ let make = () => {
       ();
     };
 
-  let getCoords = (lat, lon) => {
-    Js.log3("corrds", lat, lon);
-  };
+  let getCoords = (lat, lon) =>
+    if (lat > (-1.0) && lon > (-1.0)) {
+      Axios.get(
+        "http://api.openweathermap.org/data/2.5/weather?lat="
+        ++ Js.Float.toString(lat)
+        ++ "&lon="
+        ++ Js.Float.toString(lon)
+        ++ "&units=imperial&APPID="
+        ++ api_key,
+      )
+      |> Js.Promise.then_(res =>
+           Js.Promise.resolve(Decode.weather_format(res##data))
+         )
+      |> Js.Promise.then_(value =>
+           Js.Promise.resolve(
+             setForecast(_ =>
+               {
+                 main:
+                   switch (value.weather) {
+                   | None => ""
+                   | Some(weather_details) => weather_details[0].main
+                   },
+                 description:
+                   switch (value.weather) {
+                   | None => ""
+                   | Some(weather_details) => weather_details[0].description
+                   },
+                 temp:
+                   switch (value.main) {
+                   | None => 0.
+                   | Some(main) => (main.temp -. 32.0) *. 5.0 /. 9.0
+                   },
+               }
+             ),
+           )
+         )
+      |> Js.Promise.catch(_err =>
+           Js.Promise.resolve(
+             setForecast(_ => {main: "", description: "Not found", temp: 0.}),
+           )
+         )
+      |> ignore;
+      ();
+    };
 
   <View style=styles##container>
     <ImageBackground
@@ -168,7 +209,9 @@ let make = () => {
               placeholder="Register"
               onSubmitEditing=submitEdit
             />
-            <View style=styles##location> <LocationButton /> </View>
+            <View style=styles##location>
+              <LocationButton onGetCoords=getCoords />
+            </View>
           </View>
         </View>
         {switch (forecast.main) {
